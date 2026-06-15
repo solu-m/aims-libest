@@ -1,0 +1,66 @@
+{
+  "tenants": [
+    {
+      "tenant_id": "company-a",
+      "tenant_name": "Company A Production",
+      "ca_cert_file": "/etc/est/company-a/ca.pem",
+      "ca_key_file": "/etc/est/company-a/key.pem",
+      "truststore_file": "/etc/est/company-a/truststore.pem",
+      "clients": [
+        {
+          "client_id": "device-1",
+          "password": "secret123",
+          "server_id": "company-a"
+        },
+        {
+          "client_id": "device-2",
+          "password": "secret456",
+          "server_id": "company-a"
+        },
+        {
+          "client_id": "sensor-101",
+          "password": "sensor_pass_001",
+          "server_id": "company-a"
+        }
+      ]
+    },
+    {
+      "tenant_id": "company-b",
+      "tenant_name": "Company B Testing",
+      "ca_cert_file": "/etc/est/company-b/ca.pem",
+      "ca_key_file": "/etc/est/company-b/key.pem",
+      "truststore_file": "/etc/est/company-b/truststore.pem",
+      "clients": [
+        {
+          "client_id": "test-device-1",
+          "password": "testpass123",
+          "server_id": "company-b"
+        },
+        {
+          "client_id": "test-device-2",
+          "password": "testpass456",
+          "server_id": "company-b"
+        }
+      ]
+    },
+    {
+      "tenant_id": "acme-corp",
+      "tenant_name": "ACME Corporation",
+      "ca_cert_file": "/etc/est/acme/ca.pem",
+      "ca_key_file": "/etc/est/acme/key.pem",
+      "truststore_file": "/etc/est/acme/truststore.pem",
+      "clients": [
+        {
+          "client_id": "edge-gateway-1",
+          "password": "edge_secret_001",
+          "server_id": "acme-corp"
+        },
+        {
+          "client_id": "iot-node-5",
+          "password": "iot_pass_005",
+          "server_id": "acme-corp"
+        }
+      ]
+    }
+  ]
+}
