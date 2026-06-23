@@ -8,19 +8,25 @@
       "truststore_file": "/etc/est/company-a/truststore.pem",
       "clients": [
         {
-          "client_id": "device-1",
-          "password": "secret123",
-          "server_id": "company-a"
+          "client_id": "gateway-1",
+          "password": "gateway_secret_001",
+          "server_id": "company-a",
+          "role": "client",
+          "description": "Gateway device - receives clientAuth certificate"
         },
         {
-          "client_id": "device-2",
-          "password": "secret456",
-          "server_id": "company-a"
+          "client_id": "freeradius-1",
+          "password": "freeradius_secret_001",
+          "server_id": "company-a",
+          "role": "server",
+          "description": "FreeRADIUS server - receives serverAuth certificate"
         },
         {
           "client_id": "sensor-101",
           "password": "sensor_pass_001",
-          "server_id": "company-a"
+          "server_id": "company-a",
+          "role": "client",
+          "description": "IoT sensor device"
         }
       ]
     },
@@ -32,14 +38,18 @@
       "truststore_file": "/etc/est/company-b/truststore.pem",
       "clients": [
         {
-          "client_id": "test-device-1",
-          "password": "testpass123",
-          "server_id": "company-b"
+          "client_id": "test-gateway-1",
+          "password": "test_gateway_001",
+          "server_id": "company-b",
+          "role": "client",
+          "description": "Test gateway"
         },
         {
-          "client_id": "test-device-2",
-          "password": "testpass456",
-          "server_id": "company-b"
+          "client_id": "test-radius-1",
+          "password": "test_radius_001",
+          "server_id": "company-b",
+          "role": "server",
+          "description": "Test FreeRADIUS instance"
         }
       ]
     },
@@ -53,12 +63,16 @@
         {
           "client_id": "edge-gateway-1",
           "password": "edge_secret_001",
-          "server_id": "acme-corp"
+          "server_id": "acme-corp",
+          "role": "client",
+          "description": "Edge gateway device"
         },
         {
-          "client_id": "iot-node-5",
-          "password": "iot_pass_005",
-          "server_id": "acme-corp"
+          "client_id": "auth-server-1",
+          "password": "auth_secret_001",
+          "server_id": "acme-corp",
+          "role": "server",
+          "description": "RADIUS authentication server"
         }
       ]
     }

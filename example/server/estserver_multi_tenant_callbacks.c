@@ -28,6 +28,13 @@ static CRITICAL_SECTION enrollment_critical_section;
 
 #define MAX_CERT_LEN 8192
 
+/* Extended context for storing both tenant and client info */
+typedef struct {
+    TENANT_CONFIG *tenant;
+    char client_id[MAX_CLIENT_ID_LEN];
+    char role[64];
+} ENROLLMENT_CONTEXT;
+
 /*
  * Multi-tenant HTTP authentication callback
  *
@@ -43,6 +50,7 @@ int process_http_auth_multi_tenant(
     char tenant_id[MAX_TENANT_ID_LEN];
     char client_id[MAX_CLIENT_ID_LEN];
     char password[MAX_PASSWORD_LEN];
+    char role[64];
     int result = 0;
     
     if (!ah) {
@@ -53,6 +61,7 @@ int process_http_auth_multi_tenant(
     memset(tenant_id, 0, sizeof(tenant_id));
     memset(client_id, 0, sizeof(client_id));
     memset(password, 0, sizeof(password));
+    memset(role, 0, sizeof(role));
     
     printf("\n=== Multi-Tenant Authentication ===\n");
     printf("Auth mode: %d\n", ah->mode);
@@ -60,50 +69,59 @@ int process_http_auth_multi_tenant(
     switch (ah->mode) {
     
     case AUTH_TOKEN:
-        /*
-         * Bearer token format: "tenant_id:client_id:password"
-         * Example: "company-a:device-1:secret123"
-         */
-        printf("Processing Bearer token authentication\n");
-        printf("Token: %s\n", ah->auth_token);
-        
-        /* Parse token */
-        if (!tenant_parse_bearer_token(ah->auth_token, tenant_id, 
-                                       client_id, password)) {
-            printf("Failed to parse Bearer token\n");
-            return 0;
-        }
-        
-        printf("Parsed token - Tenant: %s, Client: %s\n", 
-               tenant_id, client_id);
-        
-        /* Find tenant in registry */
-        tenant = tenant_find_by_id(g_tenant_registry, tenant_id);
-        if (!tenant) {
-            printf("Tenant '%s' not found in registry\n", tenant_id);
-            return 0;
-        }
-        
-        printf("Found tenant: %s (%s)\n", 
-               tenant->tenant_id, tenant->tenant_name);
-        
-        /* Validate client credentials */
-        if (!tenant->active) {
-            printf("Tenant '%s' is not active\n", tenant_id);
-            return 0;
-        }
-        
-        result = tenant_validate_client(tenant, client_id, password);
-        if (result) {
-            printf("Client '%s' authenticated successfully for tenant '%s'\n",
-                   client_id, tenant_id);
-            
-            /* Store tenant context in EST context for callbacks */
-            est_set_ex_data(ctx, tenant);
-        } else {
-            printf("Client '%s' authentication failed for tenant '%s'\n",
-                   client_id, tenant_id);
-        }
+         /*
+          * Bearer token format: "tenant_id:client_id:role:password" (or "tenant_id:client_id:password")
+          * Example: "company-a:device-1:client:secret123" or "company-a:device-1:secret123"
+          */
+         printf("Processing Bearer token authentication\n");
+         printf("Token: %s\n", ah->auth_token);
+         
+         /* Parse token with role support */
+         if (!tenant_parse_bearer_token_with_role(ah->auth_token, tenant_id, 
+                                                    client_id, role, password)) {
+             printf("Failed to parse Bearer token\n");
+             return 0;
+         }
+         
+         printf("Parsed token - Tenant: %s, Client: %s, Role: %s\n", 
+                tenant_id, client_id, role);
+         
+         /* Find tenant in registry */
+         tenant = tenant_find_by_id(g_tenant_registry, tenant_id);
+         if (!tenant) {
+             printf("Tenant '%s' not found in registry\n", tenant_id);
+             return 0;
+         }
+         
+         printf("Found tenant: %s (%s)\n", 
+                tenant->tenant_id, tenant->tenant_name);
+         
+         /* Validate client credentials */
+         if (!tenant->active) {
+             printf("Tenant '%s' is not active\n", tenant_id);
+             return 0;
+         }
+         
+         result = tenant_validate_client(tenant, client_id, password);
+         if (result) {
+             printf("Client '%s' authenticated successfully for tenant '%s'\n",
+                    client_id, tenant_id);
+             
+             /* Create extended context with tenant and client info */
+             ENROLLMENT_CONTEXT *enroll_ctx = malloc(sizeof(ENROLLMENT_CONTEXT));
+             if (enroll_ctx) {
+                 enroll_ctx->tenant = tenant;
+                 strncpy(enroll_ctx->client_id, client_id, MAX_CLIENT_ID_LEN - 1);
+                 strncpy(enroll_ctx->role, role, sizeof(enroll_ctx->role) - 1);
+                 est_set_ex_data(ctx, enroll_ctx);
+             } else {
+                 printf("Warning: Failed to allocate enrollment context\n");
+                 est_set_ex_data(ctx, tenant);
+             }
+         } else {
+             printf("Client '%s' authentication failed for tenant '%s'\n",
+                    client_id, tenant_id);
+         }
         
         break;
     
@@ -169,7 +187,9 @@ int process_pkcs10_enrollment_multi_tenant(
     char *user_id, X509 *peer_cert, char *path_seg,
     void *app_data)
 {
-    TENANT_CONFIG *tenant = (TENANT_CONFIG *)app_data;
+    TENANT_CONFIG *tenant = NULL;
+    ENROLLMENT_CONTEXT *enroll_ctx = NULL;
+    char *role = NULL;
     BIO *result = NULL;
     char *buf = NULL;
     int rc = 0;
@@ -177,10 +197,26 @@ int process_pkcs10_enrollment_multi_tenant(
     fprintf(stderr, "\n=== Multi-Tenant Enrollment ===\n");
     fprintf(stderr, "Entering %s\n", __FUNCTION__);
     
-    if (!tenant) {
-        fprintf(stderr, "Error: Invalid tenant context (app_data is NULL)\n");
-        fprintf(stderr, "This callback must be called with tenant context set via est_set_ex_data()\n");
+    if (!app_data) {
+        fprintf(stderr, "Error: Invalid context (app_data is NULL)\n");
         return EST_ERR_INVALID_PARAMETERS;
+    }
+    
+    /* Check if app_data is ENROLLMENT_CONTEXT or just TENANT_CONFIG */
+    /* We'll try to detect this by checking if it looks like an ENROLLMENT_CONTEXT */
+    enroll_ctx = (ENROLLMENT_CONTEXT *)app_data;
+    if (enroll_ctx && enroll_ctx->tenant) {
+        tenant = enroll_ctx->tenant;
+        role = enroll_ctx->role;
+        fprintf(stderr, "Using ENROLLMENT_CONTEXT - Client: %s, Role: %s\n",
+                enroll_ctx->client_id, role ? role : "server");
+    } else {
+        tenant = (TENANT_CONFIG *)app_data;
+        if (!tenant || !tenant->tenant_id || !tenant->tenant_id[0]) {
+            fprintf(stderr, "Error: Invalid tenant context\n");
+            return EST_ERR_INVALID_PARAMETERS;
+        }
+        fprintf(stderr, "Using legacy TENANT_CONFIG\n");
     }
     
     fprintf(stderr, "Processing enrollment for tenant: %s (%s)\n",
@@ -205,18 +241,6 @@ int process_pkcs10_enrollment_multi_tenant(
     
     fprintf(stderr, "Tenant initialized. CA certs available: %d bytes\n",
             tenant->ca_certs_len);
-    
-    /* 
-     * TODO: Call tenant-specific enrollment function
-     * This requires creating a tenant-specific CA context or modifying
-     * ossl_simple_enroll() to accept tenant configuration
-     * 
-     * For now, we use the global ossl_simple_enroll as a placeholder.
-     * In production, you would:
-     * 1. Load tenant's CA cert and key
-     * 2. Sign the CSR with tenant's CA
-     * 3. Return tenant-specific certificate
-     */
     
 #ifndef WIN32
     rc = pthread_mutex_lock(&enrollment_mutex);
@@ -256,6 +280,21 @@ int process_pkcs10_enrollment_multi_tenant(
         if (!*pkcs7) {
             fprintf(stderr, "Error: Memory allocation failed\n");
             BIO_free_all(result);
+            return EST_ERR_MALLOC;
+        }
+        memcpy(*pkcs7, buf, *pkcs7_len);
+        fprintf(stderr, "Successfully enrolled client with role '%s'. Certificate size: %d bytes\n",
+                role ? role : "server", *pkcs7_len);
+    } else {
+        fprintf(stderr, "Error: Invalid certificate size: %d\n", *pkcs7_len);
+        BIO_free_all(result);
+        return EST_ERR_INVALID_PARAMETERS;
+    }
+    
+    BIO_free_all(result);
+    
+    fprintf(stderr, "Enrollment complete for tenant: %s\n", tenant->tenant_id);
+    return EST_ERR_NONE;
             return EST_ERR_MALLOC;
         }
         memcpy(*pkcs7, buf, *pkcs7_len);

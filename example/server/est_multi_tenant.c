@@ -242,7 +242,17 @@ int tenant_config_load_from_file(const char *config_file,
                                     printf("    server_id: %s\n", 
                                            current_tenant->clients[c].server_id);
                                 }
-                                
+                                 
+                                else if (jsoneq((char *)config_data, &tokens[client_off], 
+                                               "role") == 0) {
+                                    json_extract_string((char *)config_data, 
+                                                      &tokens[client_off + 1],
+                                                      current_tenant->clients[c].role,
+                                                      sizeof(current_tenant->clients[c].role));
+                                    printf("    role: %s\n", 
+                                           current_tenant->clients[c].role);
+                                }
+                                 
                                 client_off += 2;
                             }
                             
@@ -348,6 +358,75 @@ int tenant_parse_bearer_token(const char *token,
     }
     
     return 1;
+}
+
+/*
+ * Parse Bearer token with role: "tenant_id:client_id:role:password"
+ */
+int tenant_parse_bearer_token_with_role(const char *token,
+                                        char *tenant_id,
+                                        char *client_id,
+                                        char *role,
+                                        char *password)
+{
+    int result;
+    
+    if (!token || !tenant_id || !client_id || !role || !password) {
+        return 0;
+    }
+    
+    /* Parse token format: tenant_id:client_id:role:password */
+    result = sscanf(token, "%63[^:]:%63[^:]:%63[^:]:%255s",
+                   tenant_id, client_id, role, password);
+    
+    if (result == 4) {
+        /* New format with role */
+        return 1;
+    }
+    
+    /* Try old format without role: tenant_id:client_id:password */
+    result = sscanf(token, "%63[^:]:%63[^:]:%255s",
+                   tenant_id, client_id, password);
+    
+    if (result != 3) {
+        printf("Invalid token format. Expected: tenant_id:client_id:role:password or tenant_id:client_id:password\n");
+        return 0;
+    }
+    
+    /* Use "server" as default role if not specified */
+    strncpy(role, "server", 63);
+    return 1;
+}
+
+/*
+ * Get client role from tenant
+ */
+const char* tenant_get_client_role(TENANT_CONFIG *tenant, const char *client_id)
+{
+    int i;
+    static const char *default_role = "server";
+    
+    if (!tenant || !client_id) {
+        return default_role;
+    }
+    
+    pthread_mutex_lock(&tenant->lock);
+    
+    for (i = 0; i < tenant->client_count; i++) {
+        if (!strcmp(tenant->clients[i].client_id, client_id)) {
+            const char *role = tenant->clients[i].role;
+            pthread_mutex_unlock(&tenant->lock);
+            
+            /* Return role if set, otherwise default to "server" */
+            if (role && role[0]) {
+                return role;
+            }
+            return default_role;
+        }
+    }
+    
+    pthread_mutex_unlock(&tenant->lock);
+    return default_role;
 }
 
 /*

@@ -31,6 +31,7 @@ typedef struct {
     char client_id[MAX_CLIENT_ID_LEN];
     char password[MAX_PASSWORD_LEN];
     char server_id[MAX_TENANT_ID_LEN];     /* Which server/tenant can connect */
+    char role[64];                          /* "client" (clientAuth) or "server" (serverAuth) */
     int enrolled;                           /* Track if client has enrolled */
 } TENANT_CLIENT;
 
@@ -126,7 +127,7 @@ int tenant_validate_client(TENANT_CONFIG *tenant,
                            const char *password);
 
 /*
- * Parse Bearer token in format: "tenant_id:client_id:password"
+ * Parse Bearer token in format: "tenant_id:client_id:role:password"
  * Returns 1 on success, 0 on failure
  */
 int tenant_parse_bearer_token(const char *token,
@@ -135,9 +136,24 @@ int tenant_parse_bearer_token(const char *token,
                                char *password);
 
 /*
+ * Parse Bearer token with role support in format: "tenant_id:client_id:role:password"
+ * Returns 1 on success, 0 on failure
+ */
+int tenant_parse_bearer_token_with_role(const char *token,
+                                        char *tenant_id,
+                                        char *client_id,
+                                        char *role,
+                                        char *password);
+
+/*
  * Initialize EST context for a tenant
  */
 EST_ERROR tenant_init_est_context(TENANT_CONFIG *tenant);
+
+/*
+ * Get client role from tenant
+ */
+const char* tenant_get_client_role(TENANT_CONFIG *tenant, const char *client_id);
 
 /*
  * Cleanup and destroy tenant registry
@@ -148,5 +164,11 @@ void tenant_registry_cleanup(TENANT_REGISTRY *registry);
  * Cleanup single tenant
  */
 void tenant_cleanup(TENANT_CONFIG *tenant);
+
+/*
+ * Role-based enrollment: Support clientAuth and serverAuth certificates
+ * Accepts roles: "client" or "server"
+ */
+BIO * ossl_role_based_enroll(const char *p10buf, int p10len, const char *role);
 
 #endif /* EST_MULTI_TENANT_H */
