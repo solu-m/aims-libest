@@ -70,12 +70,16 @@ RUN mkdir -p /build/certs && \
         -subj "/C=US/ST=CA/L=SanJose/O=Cisco/CN=est-server"
 
 # Build libest with multi-tenant support
+# Use existing configure script instead of regenerating
 RUN cd /build && \
-    ./autogen.sh && \
+    if [ ! -f configure ]; then \
+        ./autogen.sh; \
+    fi && \
     ./configure --prefix=/opt/est \
                 --with-ssl-dir=/usr \
-                --disable-safec && \
-    make && \
+                --disable-safec \
+                CFLAGS="-Wno-error" && \
+    make -j$(nproc) && \
     make install
 
 # Stage 2: Runtime environment
