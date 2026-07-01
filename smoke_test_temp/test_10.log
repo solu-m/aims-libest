@@ -1,0 +1,34 @@
+Using configuration from /mnt/c/Users/Solum/aims-libest/tenants/freeradius/freeradius.cnf
+Can't open /mnt/c/Users/Solum/aims-libest/tenants/freeradius/index.txt.attr for reading, No such file or directory
+134604572893632:error:02001002:system library:fopen:No such file or directory:../crypto/bio/bss_file.c:72:fopen('/mnt/c/Users/Solum/aims-libest/tenants/freeradius/index.txt.attr','r')
+134604572893632:error:2006D080:BIO routines:BIO_new_file:no such file:../crypto/bio/bss_file.c:79:
+Check that the request matches the signature
+Signature ok
+Certificate Details:
+        Serial Number: 1 (0x1)
+        Validity
+            Not Before: Jul  1 07:45:14 2026 GMT
+            Not After : Jul  1 07:45:14 2027 GMT
+        Subject:
+            commonName                = test-freeradius-device
+            countryName               = US
+            stateOrProvinceName       = CA
+            localityName              = SanJose
+            organizationName          = Cisco
+            organizationalUnitName    = Testing
+        X509v3 extensions:
+            X509v3 Basic Constraints: 
+                CA:FALSE
+            X509v3 Key Usage: 
+                Digital Signature, Key Encipherment
+            X509v3 Extended Key Usage: 
+                TLS Web Client Authentication
+            X509v3 Subject Key Identifier: 
+                92:2E:60:CA:3E:A5:25:61:FA:79:C5:B1:89:A3:D9:E0:0B:3C:90:39
+            X509v3 Authority Key Identifier: 
+                keyid:F8:BD:C2:BE:06:03:56:F6:6B:E8:17:F4:3F:10:57:CE:A5:F6:6C:26
+
+Certificate is to be certified until Jul  1 07:45:14 2027 GMT (365 days)
+
+Write out database with 1 new entries
+Data Base Updated

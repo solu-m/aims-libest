@@ -1,0 +1,34 @@
+Using configuration from /mnt/c/Users/Solum/aims-libest/tenants/iot/iot.cnf
+Can't open /mnt/c/Users/Solum/aims-libest/tenants/iot/index.txt.attr for reading, No such file or directory
+128375121588672:error:02001002:system library:fopen:No such file or directory:../crypto/bio/bss_file.c:72:fopen('/mnt/c/Users/Solum/aims-libest/tenants/iot/index.txt.attr','r')
+128375121588672:error:2006D080:BIO routines:BIO_new_file:no such file:../crypto/bio/bss_file.c:79:
+Check that the request matches the signature
+Signature ok
+Certificate Details:
+        Serial Number: 1 (0x1)
+        Validity
+            Not Before: Jul  1 07:45:14 2026 GMT
+            Not After : Jul  1 07:45:14 2027 GMT
+        Subject:
+            commonName                = test-iot-device
+            countryName               = US
+            stateOrProvinceName       = CA
+            localityName              = SanJose
+            organizationName          = Cisco
+            organizationalUnitName    = Testing
+        X509v3 extensions:
+            X509v3 Basic Constraints: 
+                CA:FALSE
+            X509v3 Key Usage: 
+                Digital Signature, Key Encipherment
+            X509v3 Extended Key Usage: 
+                TLS Web Client Authentication
+            X509v3 Subject Key Identifier: 
+                D3:2E:06:AE:36:EC:BE:6B:01:1E:87:34:F0:E6:6B:93:3D:61:1E:CA
+            X509v3 Authority Key Identifier: 
+                keyid:6C:19:91:C7:A4:9E:45:3B:F1:CF:97:4B:D4:64:9D:5B:44:8C:70:AA
+
+Certificate is to be certified until Jul  1 07:45:14 2027 GMT (365 days)
+
+Write out database with 1 new entries
+Data Base Updated

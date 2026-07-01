@@ -71,6 +71,7 @@ RUN mkdir -p /build/certs && \
 
 # Build libest with multi-tenant support
 # Use existing configure script instead of regenerating
+# Build only library and server (skip client to avoid FIPS_mode issues with OpenSSL 3.0)
 RUN cd /build && \
     if [ ! -f configure ]; then \
         ./autogen.sh; \
@@ -78,9 +79,13 @@ RUN cd /build && \
     ./configure --prefix=/opt/est \
                 --with-ssl-dir=/usr \
                 --disable-safec \
-                CFLAGS="-Wno-error" && \
-    make -j$(nproc) && \
-    make install
+                CFLAGS="-Wno-error -DOPENSSL_API_COMPAT=0x10100000L" && \
+    make -j$(nproc) -C safe_c_stub && \
+    make -j$(nproc) -C src && \
+    make -j$(nproc) -C example/server && \
+    make install -C safe_c_stub && \
+    make install -C src && \
+    make install -C example/server
 
 # Stage 2: Runtime environment
 FROM ubuntu:22.04
