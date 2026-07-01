@@ -70,13 +70,10 @@ RUN mkdir -p /build/certs && \
         -subj "/C=US/ST=CA/L=SanJose/O=Cisco/CN=est-server"
 
 # Build libest with multi-tenant support
-# Use existing configure script instead of regenerating
+# Use existing configure script (skip autogen.sh to avoid AM_INIT_AUTOMAKE duplication)
 # Build only library and server (skip client to avoid FIPS_mode issues with OpenSSL 3.0)
+# Configure reads updated Makefile.am and generates correct Makefiles automatically
 RUN cd /build && \
-    if [ ! -f configure ]; then \
-        ./autogen.sh; \
-    fi && \
-    autoreconf -fi && \
     ./configure --prefix=/opt/est \
                 --with-ssl-dir=/usr \
                 --disable-safec \
