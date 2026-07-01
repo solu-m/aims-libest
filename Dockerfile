@@ -76,19 +76,13 @@ RUN cd /build && \
     if [ ! -f configure ]; then \
         ./autogen.sh; \
     fi && \
+    autoreconf -fi && \
     ./configure --prefix=/opt/est \
                 --with-ssl-dir=/usr \
                 --disable-safec \
                 CFLAGS="-Wno-error -DOPENSSL_API_COMPAT=0x10100000L" && \
     make -j$(nproc) -C safe_c_stub && \
     make -j$(nproc) -C src && \
-    cd /build/example/server && \
-    autoreconf -fi && \
-    cd /build && \
-    ./configure --prefix=/opt/est \
-                --with-ssl-dir=/usr \
-                --disable-safec \
-                CFLAGS="-Wno-error -DOPENSSL_API_COMPAT=0x10100000L" && \
     make -j$(nproc) -C example/server && \
     make install -C safe_c_stub && \
     make install -C src && \
