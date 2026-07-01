@@ -2281,17 +2281,12 @@ int main (int argc, char **argv)
             strncpy(realm, optarg, MAX_REALM_LEN);
             break;
         case 'f':
-            /* turn FIPS on if user requested it
-             * and exit if failure.
+            /* FIPS mode removed in OpenSSL 3.0
+             * For production, configure FIPS at OpenSSL provider level
              */
-            set_fips_return = FIPS_mode_set(1);
-            if (set_fips_return != 1) {
-                set_fips_error = ERR_get_error();
-                printf("\nERROR WHILE SETTING FIPS MODE ON exiting ....\n");
-                exit(1);
-            } else {
-                printf("\nRunning EST Sample Server with FIPS MODE = ON !\n");
-            }
+            printf("\nFIPS mode flag ignored (OpenSSL 3.0+ uses provider configuration)\n");
+            printf("Configure FIPS via openssl.cnf if required for production\n");
+            set_fips_return = 1; // Compatibility stub
             ;
             break;
         default:
