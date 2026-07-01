@@ -72,7 +72,7 @@ RUN mkdir -p /build/certs && \
 # Build libest with multi-tenant support
 # Use existing configure script (skip autogen.sh to avoid AM_INIT_AUTOMAKE duplication)
 # Build only library and server (skip client to avoid FIPS_mode issues with OpenSSL 3.0)
-# Configure reads updated Makefile.am and generates correct Makefiles automatically
+# Compile multi_tenant_enrollment.c directly and link with server
 RUN cd /build && \
     ./configure --prefix=/opt/est \
                 --with-ssl-dir=/usr \
@@ -80,7 +80,10 @@ RUN cd /build && \
                 CFLAGS="-Wno-error -DOPENSSL_API_COMPAT=0x10100000L" && \
     make -j$(nproc) -C safe_c_stub && \
     make -j$(nproc) -C src && \
-    make -j$(nproc) -C example/server && \
+    cd /build/example/server && \
+    gcc -c multi_tenant_enrollment.c -I../../src/est -I/usr/include -DHAVE_CONFIG_H -Wno-error -DOPENSSL_API_COMPAT=0x10100000L -Wall && \
+    cd /build && \
+    make -j$(nproc) -C example/server LDADD="multi_tenant_enrollment.o" && \
     make install -C safe_c_stub && \
     make install -C src && \
     make install -C example/server
