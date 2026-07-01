@@ -21,8 +21,7 @@ WORKDIR /build
 COPY . /build/
 
 # Set up tenant infrastructure
-RUN bash -c ' \
-    set -e; \
+RUN bash -c 'set -e; \
     TENANTS_DIR="/build/tenants"; \
     mkdir -p "$TENANTS_DIR"; \
     for tenant in gateway iot freeradius; do \
@@ -36,62 +35,21 @@ RUN bash -c ' \
             -key "$TENANTS_DIR/$tenant/private/cakey.pem" \
             -out "$TENANTS_DIR/$tenant/cacert.crt" -sha256 \
             -subj "/C=US/ST=CA/L=SanJose/O=Cisco/OU=$tenant/CN=$tenant-CA" 2>/dev/null; \
-        cat > "$TENANTS_DIR/$tenant/$tenant.cnf" <<EOF
-[ ca ]
-default_ca = CA_default
-
-[ CA_default ]
-dir            = /opt/est/tenants/$tenant
-database       = \$dir/index.txt
-new_certs_dir  = \$dir/newcerts
-certificate    = \$dir/cacert.crt
-serial         = \$dir/serial
-private_key    = \$dir/private/cakey.pem
-RANDFILE       = \$dir/private/.rnd
-default_days   = 365
-default_crl_days = 30
-default_md     = sha256
-policy         = policy_any
-email_in_dn    = no
-name_opt       = ca_default
-cert_opt       = ca_default
-copy_extensions = none
-x509_extensions = client_cert
-unique_subject = no
-
-[ policy_any ]
-commonName     = supplied
-countryName    = optional
-stateOrProvinceName = optional
-localityName   = optional
-organizationName = optional
-organizationalUnitName = optional
-serialNumber   = optional
-
-[ client_cert ]
-basicConstraints = CA:FALSE
-keyUsage = digitalSignature, keyEncipherment
-extendedKeyUsage = clientAuth
-subjectKeyIdentifier = hash
-authorityKeyIdentifier = keyid
-
-[ req_distinguished_name ]
-countryName            = Country Name
-stateOrProvinceName    = State or Province Name
-localityName           = Locality Name
-organizationName       = Organization Name
-commonName             = Common Name
-
-[ req ]
-default_bits       = 2048
-distinguished_name = req_distinguished_name
-EOF
-        chmod 644 "$TENANTS_DIR/$tenant/$tenant.cnf"; \
-        chmod 600 "$TENANTS_DIR/$tenant/private/cakey.pem"; \
         echo "Tenant $tenant setup complete"; \
     done; \
-    echo "All tenants configured successfully" \
-'
+    echo "All tenants configured successfully"'
+
+# Create OpenSSL configuration files for each tenant
+COPY tenants/gateway/gateway.cnf /build/tenants/gateway/gateway.cnf
+COPY tenants/iot/iot.cnf /build/tenants/iot/iot.cnf
+COPY tenants/freeradius/freeradius.cnf /build/tenants/freeradius/freeradius.cnf
+
+# Update config paths to Docker runtime paths
+RUN sed -i 's|dir.*=.*|dir            = /opt/est/tenants/gateway|g' /build/tenants/gateway/gateway.cnf && \
+    sed -i 's|dir.*=.*|dir            = /opt/est/tenants/iot|g' /build/tenants/iot/iot.cnf && \
+    sed -i 's|dir.*=.*|dir            = /opt/est/tenants/freeradius|g' /build/tenants/freeradius/freeradius.cnf && \
+    chmod 644 /build/tenants/*//*.cnf && \
+    chmod 600 /build/tenants/*/private/*.pem
 
 # Update multi_tenant_enrollment.c to use Docker paths
 RUN sed -i 's|#define REPO_ROOT.*|#define REPO_ROOT "/opt/est"|g' \
