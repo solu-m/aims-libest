@@ -36,6 +36,7 @@
 #include <openssl/md5.h>
 #include <est.h>
 #include "ossl_srv.h"
+#include "multi_tenant_enrollment.h"
 #include "../util/utils.h"
 #include "../util/simple_server.h"
 #include "../util/jsmn.h"
@@ -914,67 +915,54 @@ static int process_srvr_side_keygen_pkcs10_enrollment (unsigned char * pkcs10, i
 #endif
     char sn[64];
     char file_name[MAX_FILENAME_LEN];
+    const char *tenant_id = NULL;
 
+    fprintf(stderr, "\n[MULTI-TENANT-KEYGEN] Server-side keygen enrollment request\n");
+    
     if (verbose) {
-        /*
-         * Informational only
-         */
         if (user_id) {
-            /*
-             * Should be safe to log the user ID here since HTTP auth
-             * has succeeded at this point.
-             */
-            printf("\n%s - User ID is %s\n", __FUNCTION__, user_id);
+            printf("[AUTH] User ID: %s\n", user_id);
         }
         if (peer_cert) {
             memset(sn, 0, 64);
             extract_sub_name(peer_cert, sn, 64);
-            printf("\n%s - Peer cert CN is %s\n", __FUNCTION__, sn);
+            printf("[AUTH] Peer cert CN: %s\n", sn);
         }
         if (app_data) {
-            printf("ex_data value is %x\n", *((unsigned int *) app_data));
-        }
-        if (path_seg) {
-            printf("\nPath segment was included in enrollment URI. "
-                "Path Segment = %s\n", path_seg);
+            printf("[DEBUG] ex_data value: %x\n", *((unsigned int *) app_data));
         }
     }
 
-    /*
-     * If we're simulating manual certificate enrollment,
-     * the CA will not automatically sign the cert request.
-     * We'll attempt to lookup in our local table if this
-     * cert has already been sent to us, if not, add it
-     * to the table and send the 'retry' message back to the
-     * client.  But if this cert request has been seen in the
-     * past, then we'll continue with the enrollment.
-     * To summarize, we're simulating manual enrollment by
-     * forcing the client to request twice, and we'll automatically
-     * enroll on the second request.
-     */
+    /* Extract tenant ID from path segment */
+    if (path_seg && strlen(path_seg) > 0) {
+        tenant_id = path_seg;
+        fprintf(stderr, "[ROUTING] Tenant ID: '%s'\n", tenant_id);
+    } else {
+        fprintf(stderr, "[ERROR] No tenant ID in path segment\n");
+        return EST_ERR_AUTH_FAIL;
+    }
+
+    /* Validate tenant ID */
+    if (strcmp(tenant_id, "gateway") != 0 && 
+        strcmp(tenant_id, "iot") != 0 && 
+        strcmp(tenant_id, "freeradius") != 0) {
+        fprintf(stderr, "[ERROR] Invalid tenant ID: '%s'\n", tenant_id);
+        return EST_ERR_AUTH_FAIL;
+    }
+
     if (manual_enroll) {
         if (lookup_pkcs10_request(pkcs10, p10_len)) {
-            /*
-             * We've seen this cert request in the past.
-             * Remove it from the lookup table and allow
-             * the enrollment to continue.
-             * Fall-thru to enrollment logic below
-             */
+            fprintf(stderr, "[MANUAL] Second request, continuing\n");
         } else {
-            /*
-             * Couldn't find this request, it's the first time
-             * we've seen it.  Therefore, send the retry
-             * response.
-             */
+            fprintf(stderr, "[MANUAL] First request, sending retry\n");
             return (EST_ERR_CA_ENROLL_RETRY);
         }
-
     }
 
 #ifndef WIN32
     rc = pthread_mutex_lock(&m);
     if (rc) {
-        printf("\nmutex lock failed rc=%d", rc);
+        fprintf(stderr, "[ERROR] Mutex lock failed rc=%d\n", rc);
         exit(1);
     }
 #else
@@ -982,36 +970,47 @@ static int process_srvr_side_keygen_pkcs10_enrollment (unsigned char * pkcs10, i
 #endif
 
     if (write_csr) {
-        /*
-         * Dump out pkcs10 to a file, this will contain a list of the OIDs in the CSR.
-         */
-        snprintf(file_name, MAX_FILENAME_LEN, "/tmp/csr.p10");
+        snprintf(file_name, MAX_FILENAME_LEN, "/tmp/csr_keygen_%s.p10", tenant_id);
         write_binary_file(file_name, pkcs10, p10_len);
     }
 
-    result = ossl_simple_enroll(pkcs10, p10_len);
+    /* Call multi-tenant enrollment pipeline */
+    result = multi_tenant_enroll(pkcs10, p10_len, tenant_id);
+
 #ifndef WIN32
     rc = pthread_mutex_unlock(&m);
     if (rc) {
-        printf("\nmutex unlock failed rc=%d", rc);
+        fprintf(stderr, "[ERROR] Mutex unlock failed rc=%d\n", rc);
         exit(1);
     }
 #else
     LeaveCriticalSection(&enrollment_critical_section);
 #endif
 
-    /*
-     * The result is a BIO containing the pkcs7 signed certificate
-     * Need to convert it to char and copy the results so we can
-     * free the BIO.
-     */
+    if (!result) {
+        fprintf(stderr, "[ERROR] Keygen enrollment failed for tenant: %s\n", tenant_id);
+        return EST_ERR_CA_ENROLL_FAIL;
+    }
+
     *pkcs7_len = BIO_get_mem_data(result, (char**) &buf);
     if (*pkcs7_len > 0 && *pkcs7_len < MAX_CERT_LEN) {
         *pkcs7 = malloc(*pkcs7_len);
-        memcpy(*pkcs7, buf, *pkcs7_len);
+        if (*pkcs7) {
+            memcpy(*pkcs7, buf, *pkcs7_len);
+        } else {
+            BIO_free_all(result);
+            return EST_ERR_CA_ENROLL_FAIL;
+        }
+    } else {
+        BIO_free_all(result);
+        return EST_ERR_CA_ENROLL_FAIL;
     }
 
     BIO_free_all(result);
+    
+    /* Note: pkcs8 (private key) is generated separately by generate_private_key callback */
+    /* We don't modify that here - just handle the certificate signing */
+    
     return EST_ERR_NONE;
 }
 

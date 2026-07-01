@@ -1,0 +1,67 @@
+version: '3.8'
+
+services:
+  # Multi-Tenant EST Server
+  est-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: multi-tenant-est-server
+    hostname: est-server
+    ports:
+      - "8085:8085"
+    networks:
+      - est-network
+    volumes:
+      # Persist tenant data
+      - tenant-data:/opt/est/tenants
+      # Logs
+      - ./logs:/opt/est/logs
+    environment:
+      - EST_LOG_LEVEL=verbose
+    healthcheck:
+      test: ["CMD", "curl", "-k", "https://localhost:8085/.well-known/est/gateway/cacerts"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    labels:
+      - "com.example.service=multi-tenant-ca"
+      - "com.example.tenants=gateway,iot,freeradius"
+
+  # Test Client Container
+  test-client:
+    image: ubuntu:22.04
+    container_name: est-test-client
+    hostname: test-client
+    networks:
+      - est-network
+    depends_on:
+      est-server:
+        condition: service_healthy
+    volumes:
+      - ./test-results:/test-results
+      - ./docker-test.sh:/docker-test.sh
+    command: >
+      bash -c "
+        apt-get update && 
+        apt-get install -y openssl curl jq &&
+        chmod +x /docker-test.sh &&
+        /docker-test.sh
+      "
+    profiles:
+      - test
+
+networks:
+  est-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16
+
+volumes:
+  tenant-data:
+    driver: local
+    labels:
+      - "com.example.description=Multi-tenant CA certificate databases"
