@@ -72,7 +72,7 @@ RUN mkdir -p /build/certs && \
 # Build libest with multi-tenant support
 # Use existing configure script (skip autogen.sh to avoid AM_INIT_AUTOMAKE duplication)
 # Build only library and server (skip client to avoid FIPS_mode issues with OpenSSL 3.0)
-# Add FIPS compatibility stub for OpenSSL 3.0
+# FIPS compatibility stubs are now in est_ossl_util.c (compiled into libest.so)
 # Compile multi_tenant_enrollment.c directly and link with server
 RUN cd /build && \
     ./configure --prefix=/opt/est \
@@ -80,10 +80,7 @@ RUN cd /build && \
                 --disable-safec \
                 CFLAGS="-Wno-error -DOPENSSL_API_COMPAT=0x10100000L" && \
     make -j$(nproc) -C safe_c_stub && \
-    cd /build/src/est && \
-    gcc -c fips_compat.c -I. -I/usr/include -fPIC -DHAVE_CONFIG_H -Wno-error -DOPENSSL_API_COMPAT=0x10100000L && \
-    cd /build && \
-    make -j$(nproc) -C src LDADD="fips_compat.o" && \
+    make -j$(nproc) -C src && \
     cd /build/example/server && \
     gcc -c multi_tenant_enrollment.c -I../../src/est -I/usr/include -DHAVE_CONFIG_H -Wno-error -DOPENSSL_API_COMPAT=0x10100000L -Wall && \
     cd /build && \
