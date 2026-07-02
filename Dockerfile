@@ -111,8 +111,6 @@ RUN mkdir -p /opt/est/tenants && \
 COPY --from=builder /opt/est /opt/est
 COPY --from=builder /build/tenants /opt/est/tenants
 COPY --from=builder /build/certs /opt/est/certs
-COPY --from=builder /build/example/server/estserver /opt/est/bin/estserver
-COPY --from=builder /build/example/server/.libs/*.so* /opt/est/lib/ 2>/dev/null || true
 
 # Set ownership
 RUN chown -R estuser:estuser /opt/est && \
