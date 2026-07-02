@@ -111,21 +111,24 @@ for TENANT in "${TENANTS[@]}"; do
     # Generate device key and CSR
     DEVICE_KEY="$TEST_DIR/${TENANT}_device.key"
     DEVICE_CSR="$TEST_DIR/${TENANT}_device.csr"
-    DEVICE_DER="$TEST_DIR/${TENANT}_device.der"
+    DEVICE_B64="$TEST_DIR/${TENANT}_device.b64"
     DEVICE_CERT="$TEST_DIR/${TENANT}_device_cert.p7"
     DEVICE_CERT_PEM="$TEST_DIR/${TENANT}_device_cert.pem"
     
     openssl genrsa -out "$DEVICE_KEY" 2048 2>/dev/null
     openssl req -new -key "$DEVICE_KEY" -out "$DEVICE_CSR" \
         -subj "/C=US/ST=CA/L=SanJose/O=Cisco/OU=Testing/CN=docker-test-${TENANT}-device" 2>/dev/null
-    openssl req -in "$DEVICE_CSR" -outform DER -out "$DEVICE_DER"
+    
+    # Convert CSR to base64-encoded DER format (EST protocol requirement)
+    openssl req -in "$DEVICE_CSR" -outform DER | base64 > "$DEVICE_B64"
     
     # Test: Simple enrollment (with HTTP Basic Auth)
     run_test "  Enroll device with $TENANT tenant" \
         "curl -k -s -X POST $EST_SERVER/.well-known/est/$TENANT/simpleenroll \
               -H 'Content-Type: application/pkcs10' \
+              -H 'Content-Transfer-Encoding: base64' \
               -u estuser:estpwd \
-              --data-binary @$DEVICE_DER \
+              --data-binary @$DEVICE_B64 \
               -o $DEVICE_CERT && test -s $DEVICE_CERT"
     
     # Test: Verify enrolled certificate
