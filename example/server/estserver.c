@@ -789,7 +789,29 @@ int process_pkcs10_enrollment (unsigned char * pkcs10, int p10_len,
         write_binary_file(file_name, pkcs10, p10_len);
     }
 
-    result = ossl_simple_enroll(pkcs10, p10_len);
+    /*
+     * Multi-tenant enrollment support
+     * If path_seg is provided, route to tenant-specific CA
+     */
+    if (path_seg && strnlen(path_seg, 100) > 0) {
+        if (verbose) {
+            printf("\n%s - Multi-tenant enrollment for tenant: %s\n", __FUNCTION__, path_seg);
+        }
+        
+        /* Call multi-tenant enrollment function */
+        result = multi_tenant_enroll(pkcs10, p10_len, path_seg);
+        if (!result) {
+            fprintf(stderr, "\n%s - Multi-tenant enrollment failed for tenant: %s\n", __FUNCTION__, path_seg);
+            return EST_ERR_CA_ENROLL_FAIL;
+        }
+    } else {
+        /* Standard single-tenant enrollment */
+        if (verbose) {
+            printf("\n%s - Standard enrollment (no tenant specified)\n", __FUNCTION__);
+        }
+        result = ossl_simple_enroll(pkcs10, p10_len);
+    }
+    
 #ifndef WIN32
     rc = pthread_mutex_unlock(&m);
     if (rc) {
