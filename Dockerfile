@@ -138,8 +138,7 @@ CMD ["/opt/est/bin/estserver", \
      "-p", "8085", \
      "-c", "/opt/est/certs/server.crt", \
      "-k", "/opt/est/certs/server.key", \
-     "-r", "/opt/est/tenants/gateway/cacert.crt", \
-     "-u", \
+     "-r", "estCA", \
      "-b"]
 
 # Labels
