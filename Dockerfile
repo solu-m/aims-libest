@@ -9,6 +9,8 @@ RUN apt-get update && apt-get install -y \
     automake \
     libtool \
     libssl-dev \
+    liburiparser-dev \
+    pkg-config \
     git \
     wget \
     curl \
