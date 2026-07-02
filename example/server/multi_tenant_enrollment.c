@@ -81,21 +81,36 @@ BIO * multi_tenant_enroll(const unsigned char *p10buf, int p10len, const char *t
     snprintf(pkcs7_file, MAX_PATH_LEN, "%s/tmp_client.p7", tenant_dir);
     snprintf(config_file, MAX_PATH_LEN, "%s/%s.cnf", tenant_dir, tenant_id);
     
-    // [2] Write binary DER CSR to disk
-    fp = fopen(der_file, "wb");
+    // [2] Write base64-encoded CSR to disk, then decode to DER
+    // EST protocol sends base64-encoded PKCS#10, we need binary DER for OpenSSL
+    char b64_file[MAX_PATH_LEN];
+    snprintf(b64_file, MAX_PATH_LEN, "%s/tmp_client.b64", tenant_dir);
+    
+    fp = fopen(b64_file, "wb");
     if (!fp) {
-        fprintf(stderr, "[ERROR] Failed to open %s for writing\n", der_file);
+        fprintf(stderr, "[ERROR] Failed to open %s for writing\n", b64_file);
         goto cleanup;
     }
     
     if (fwrite(p10buf, 1, p10len, fp) != (size_t)p10len) {
-        fprintf(stderr, "[ERROR] Failed to write complete DER data to %s\n", der_file);
+        fprintf(stderr, "[ERROR] Failed to write complete base64 data to %s\n", b64_file);
         fclose(fp);
         goto cleanup;
     }
     fclose(fp);
     fp = NULL;
-    fprintf(stderr, "[INFO] [Step 1/6] Wrote DER CSR to %s (%d bytes)\n", der_file, p10len);
+    fprintf(stderr, "[INFO] [Step 1/7] Wrote base64 CSR to %s (%d bytes)\n", b64_file, p10len);
+    
+    // Decode base64 to DER
+    snprintf(cmd, MAX_CMD_LEN, "base64 -d < %s > %s 2>&1", b64_file, der_file);
+    rc = system(cmd);
+    if (rc != 0) {
+        fprintf(stderr, "[ERROR] [Step 2/7] Base64 decode failed (rc=%d)\n", rc);
+        unlink(b64_file);
+        goto cleanup;
+    }
+    fprintf(stderr, "[INFO] [Step 2/7] Decoded base64→DER successfully\n");
+    unlink(b64_file);
     
     // [3] Convert DER→PEM (openssl req -inform DER -outform PEM)
     snprintf(cmd, MAX_CMD_LEN, 
@@ -104,10 +119,10 @@ BIO * multi_tenant_enroll(const unsigned char *p10buf, int p10len, const char *t
     
     rc = system(cmd);
     if (rc != 0) {
-        fprintf(stderr, "[ERROR] [Step 2/6] DER to PEM conversion failed (rc=%d)\n", rc);
+        fprintf(stderr, "[ERROR] [Step 3/7] DER to PEM conversion failed (rc=%d)\n", rc);
         goto cleanup;
     }
-    fprintf(stderr, "[INFO] [Step 2/6] Converted DER→PEM successfully\n");
+    fprintf(stderr, "[INFO] [Step 3/7] Converted DER→PEM successfully\n");
     
     // [4] Execute 'openssl ca' with tenant-specific config
     snprintf(cmd, MAX_CMD_LEN,
@@ -116,7 +131,7 @@ BIO * multi_tenant_enroll(const unsigned char *p10buf, int p10len, const char *t
     
     rc = system(cmd);
     if (rc != 0) {
-        fprintf(stderr, "[ERROR] [Step 3/6] OpenSSL CA signing failed (rc=%d)\n", rc);
+        fprintf(stderr, "[ERROR] [Step 4/7] OpenSSL CA signing failed (rc=%d)\n", rc);
         fprintf(stderr, "[ERROR] Command: %s\n", cmd);
         goto cleanup;
     }
@@ -129,10 +144,10 @@ BIO * multi_tenant_enroll(const unsigned char *p10buf, int p10len, const char *t
     
     rc = system(cmd);
     if (rc != 0) {
-        fprintf(stderr, "[ERROR] [Step 4/6] PKCS7 bundle creation failed (rc=%d)\n", rc);
+        fprintf(stderr, "[ERROR] [Step 5/7] PKCS7 bundle creation failed (rc=%d)\n", rc);
         goto cleanup;
     }
-    fprintf(stderr, "[INFO] [Step 4/6] Created PKCS7 bundle\n");
+    fprintf(stderr, "[INFO] [Step 5/7] Created PKCS7 bundle\n");
     
     // [6] Read PKCS7 file into memory (DER format for network transmission)
     snprintf(cmd, MAX_CMD_LEN,
@@ -141,7 +156,7 @@ BIO * multi_tenant_enroll(const unsigned char *p10buf, int p10len, const char *t
     
     rc = system(cmd);
     if (rc != 0) {
-        fprintf(stderr, "[ERROR] [Step 5/6] PKCS7 DER conversion failed (rc=%d)\n", rc);
+        fprintf(stderr, "[ERROR] [Step 6/7] PKCS7 DER conversion failed (rc=%d)\n", rc);
         goto cleanup;
     }
     
@@ -187,7 +202,7 @@ BIO * multi_tenant_enroll(const unsigned char *p10buf, int p10len, const char *t
     free(pkcs7_data);
     pkcs7_data = NULL;
     
-    fprintf(stderr, "[INFO] [Step 6/6] Loaded PKCS7 into memory (%ld bytes)\n", pkcs7_len);
+    fprintf(stderr, "[INFO] [Step 7/7] Loaded PKCS7 into memory (%ld bytes)\n", pkcs7_len);
     
     // [7] Cleanup all temporary files
     unlink(der_file);
