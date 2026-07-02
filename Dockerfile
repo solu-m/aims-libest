@@ -121,6 +121,10 @@ RUN chown -R estuser:estuser /opt/est && \
 # Set library path
 ENV LD_LIBRARY_PATH=/opt/est/lib:/usr/local/lib:$LD_LIBRARY_PATH
 
+# Set required EST environment variables
+ENV EST_CACERTS_RESP=/opt/est/certs/server.crt
+ENV EST_OPENSSL_CADIR=/opt/est/tenants/gateway
+
 # Switch to non-root user
 USER estuser
 WORKDIR /opt/est
