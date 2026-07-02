@@ -74,10 +74,12 @@ RUN mkdir -p /build/certs && \
 # Build only library and server (skip client to avoid FIPS_mode issues with OpenSSL 3.0)
 # FIPS compatibility stubs are now in est_ossl_util.c (compiled into libest.so)
 # Compile multi_tenant_enrollment.c directly and link with server
+# --with-uriparser enables path segment support for multi-tenant routing
 RUN cd /build && \
     ./configure --prefix=/opt/est \
                 --with-ssl-dir=/usr \
                 --disable-safec \
+                --with-uriparser \
                 CFLAGS="-Wno-error -DOPENSSL_API_COMPAT=0x10100000L" && \
     make -j$(nproc) -C safe_c_stub && \
     make -j$(nproc) -C src && \
@@ -98,6 +100,7 @@ RUN apt-get update && apt-get install -y \
     openssl \
     curl \
     ca-certificates \
+    liburiparser1 \
     && rm -rf /var/lib/apt/lists/*
 
 # Create application user
