@@ -219,3 +219,125 @@ cleanup:
     fprintf(stderr, "[ERROR] Multi-tenant enrollment failed for tenant: %s\n", tenant_id);
     return NULL;
 }
+
+/*
+ * Multi-Tenant CA Certs Callback
+ * 
+ * Returns the CA certificate(s) for a tenant in PKCS7 DER format.
+ * Called by libest when a client requests /.well-known/est/<tenant>/cacerts
+ *
+ * Parameters:
+ *   cacerts_len - Output: length of returned buffer
+ *   path_seg    - Tenant ID extracted from URL path (e.g., "gateway")
+ *   ex_data     - Application context (unused)
+ *
+ * Returns:
+ *   Pointer to PKCS7 DER-encoded CA cert(s), or NULL on error
+ */
+unsigned char *multi_tenant_cacerts(int *cacerts_len, char *path_seg, void *ex_data)
+{
+    char tenant_id[64] = {0};
+    char ca_cert_path[MAX_PATH_LEN];
+    char pkcs7_path[MAX_PATH_LEN];
+    char cmd[MAX_CMD_LEN];
+    FILE *fp;
+    unsigned char *pkcs7_buf = NULL;
+    long file_size;
+    size_t bytes_read;
+    int rc;
+    
+    (void)ex_data;  // Unused
+    
+    // Step 1: Extract and validate tenant ID
+    if (path_seg && strlen(path_seg) > 0 && strlen(path_seg) < sizeof(tenant_id)) {
+        strncpy(tenant_id, path_seg, sizeof(tenant_id) - 1);
+    } else {
+        // Default to gateway if no path segment
+        strncpy(tenant_id, "gateway", sizeof(tenant_id) - 1);
+    }
+    
+    fprintf(stderr, "[INFO] CA certs request for tenant: %s\n", tenant_id);
+    
+    // Step 2: Construct paths
+    snprintf(ca_cert_path, sizeof(ca_cert_path), 
+             "%s/tenants/%s/cacert.crt", REPO_ROOT, tenant_id);
+    snprintf(pkcs7_path, sizeof(pkcs7_path),
+             "%s/tenants/%s/cacerts_response.pkcs7", REPO_ROOT, tenant_id);
+    
+    // Step 3: Check if CA cert exists
+    if (access(ca_cert_path, R_OK) != 0) {
+        fprintf(stderr, "[ERROR] CA cert not found for tenant %s: %s\n", 
+                tenant_id, ca_cert_path);
+        *cacerts_len = 0;
+        return NULL;
+    }
+    
+    // Step 4: Create PKCS7 bundle from CA cert
+    // Convert PEM CA cert to PKCS7 DER format
+    snprintf(cmd, sizeof(cmd),
+             "openssl crl2pkcs7 -nocrl -certfile '%s' -outform DER -out '%s' 2>/dev/null",
+             ca_cert_path, pkcs7_path);
+    
+    rc = system(cmd);
+    if (rc != 0) {
+        fprintf(stderr, "[ERROR] Failed to create PKCS7 bundle for tenant %s (rc=%d)\n",
+                tenant_id, rc);
+        *cacerts_len = 0;
+        return NULL;
+    }
+    
+    // Step 5: Read PKCS7 DER file into memory
+    fp = fopen(pkcs7_path, "rb");
+    if (!fp) {
+        fprintf(stderr, "[ERROR] Failed to open PKCS7 file for tenant %s: %s\n",
+                tenant_id, pkcs7_path);
+        unlink(pkcs7_path);
+        *cacerts_len = 0;
+        return NULL;
+    }
+    
+    // Get file size
+    fseek(fp, 0, SEEK_END);
+    file_size = ftell(fp);
+    fseek(fp, 0, SEEK_SET);
+    
+    if (file_size <= 0 || file_size > 1048576) {  // Max 1MB
+        fprintf(stderr, "[ERROR] Invalid PKCS7 file size for tenant %s: %ld bytes\n",
+                tenant_id, file_size);
+        fclose(fp);
+        unlink(pkcs7_path);
+        *cacerts_len = 0;
+        return NULL;
+    }
+    
+    // Allocate buffer
+    pkcs7_buf = (unsigned char *)malloc(file_size);
+    if (!pkcs7_buf) {
+        fprintf(stderr, "[ERROR] Memory allocation failed for tenant %s\n", tenant_id);
+        fclose(fp);
+        unlink(pkcs7_path);
+        *cacerts_len = 0;
+        return NULL;
+    }
+    
+    // Read file
+    bytes_read = fread(pkcs7_buf, 1, file_size, fp);
+    fclose(fp);
+    
+    if (bytes_read != (size_t)file_size) {
+        fprintf(stderr, "[ERROR] Failed to read PKCS7 file for tenant %s\n", tenant_id);
+        free(pkcs7_buf);
+        unlink(pkcs7_path);
+        *cacerts_len = 0;
+        return NULL;
+    }
+    
+    // Cleanup temp file
+    unlink(pkcs7_path);
+    
+    *cacerts_len = (int)file_size;
+    fprintf(stderr, "[SUCCESS] Returning %d bytes of CA certs for tenant %s\n",
+            *cacerts_len, tenant_id);
+    
+    return pkcs7_buf;
+}

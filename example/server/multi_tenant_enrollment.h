@@ -28,4 +28,19 @@
  */
 BIO * multi_tenant_enroll(const unsigned char *p10buf, int p10len, const char *tenant_id);
 
+/*
+ * Multi-Tenant CA Certs Callback
+ *
+ * Returns the CA certificate(s) for a tenant in PKCS7 DER format.
+ *
+ * Parameters:
+ *   cacerts_len - Output: length of returned buffer
+ *   path_seg    - Tenant ID extracted from URL path
+ *   ex_data     - Application context (unused)
+ *
+ * Returns:
+ *   Pointer to PKCS7 DER-encoded CA cert(s), or NULL on error
+ */
+unsigned char *multi_tenant_cacerts(int *cacerts_len, char *path_seg, void *ex_data);
+
 #endif /* HEADER_MULTI_TENANT_ENROLLMENT_H */

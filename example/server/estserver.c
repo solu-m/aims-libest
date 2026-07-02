@@ -2327,22 +2327,27 @@ int main (int argc, char **argv)
         printf("\nUsing CSR Attributes: %s", getenv("EST_CSR_ATTR"));
     }
 
-    if (!getenv("EST_CACERTS_RESP")) {
-        printf("\nEST_CACERTS_RESP file not set, set this env variable to resolve");
-        exit(1);
-    }
+    // EST_CACERTS_RESP is optional when using multi-tenant callback
+    // The multi_tenant_cacerts() callback will dynamically generate responses
     if (!getenv("EST_TRUSTED_CERTS")) {
         printf("\nEST_TRUSTED_CERTS file not set, set this env variable to resolve");
         exit(1);
     }
 
     /*
-     * Read in the CA certificates
+     * Read in the CA certificates (optional for multi-tenant mode)
      */
-    cacerts_len = read_binary_file(getenv("EST_CACERTS_RESP"), &cacerts_raw);
-    if (cacerts_len <= 0) {
-        printf("\nEST_CACERTS_RESP file could not be read\n");
-        exit(1);
+    if (getenv("EST_CACERTS_RESP")) {
+        cacerts_len = read_binary_file(getenv("EST_CACERTS_RESP"), &cacerts_raw);
+        if (cacerts_len <= 0) {
+            printf("\nWarning: EST_CACERTS_RESP file could not be read, using callback\n");
+            cacerts_len = 0;
+            cacerts_raw = NULL;
+        }
+    } else {
+        // No static CA certs, will use callback
+        cacerts_len = 0;
+        cacerts_raw = NULL;
     }
     /*
      * Read in the trusted CA certificates for the local TLS context
@@ -2483,6 +2488,13 @@ int main (int argc, char **argv)
         printf("\nUnable to set EST CSR Attributes callback.  Aborting!!!\n");
         exit(1);
     }
+    
+    // Register multi-tenant CA certs callback
+    if (est_set_cacerts_cb(ectx, &multi_tenant_cacerts)) {
+        printf("\nUnable to set multi-tenant CA certs callback.  Aborting!!!\n");
+        exit(1);
+    }
+    
 #if ENABLE_BRSKI
     if (brski_mode) {
         /*

@@ -127,7 +127,7 @@ RUN chown -R estuser:estuser /opt/est && \
 ENV LD_LIBRARY_PATH=/opt/est/lib:/usr/local/lib:$LD_LIBRARY_PATH
 
 # Set required EST environment variables
-ENV EST_CACERTS_RESP=/opt/est/certs/server.crt
+# EST_CACERTS_RESP is not needed - using multi_tenant_cacerts() callback
 ENV EST_TRUSTED_CERTS=/opt/est/tenants/gateway/cacert.crt
 ENV EST_OPENSSL_CADIR=/opt/est/tenants/gateway
 
