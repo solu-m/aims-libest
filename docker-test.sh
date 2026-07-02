@@ -120,10 +120,11 @@ for TENANT in "${TENANTS[@]}"; do
         -subj "/C=US/ST=CA/L=SanJose/O=Cisco/OU=Testing/CN=docker-test-${TENANT}-device" 2>/dev/null
     openssl req -in "$DEVICE_CSR" -outform DER -out "$DEVICE_DER"
     
-    # Test: Simple enrollment
+    # Test: Simple enrollment (with HTTP Basic Auth)
     run_test "  Enroll device with $TENANT tenant" \
         "curl -k -s -X POST $EST_SERVER/.well-known/est/$TENANT/simpleenroll \
               -H 'Content-Type: application/pkcs10' \
+              -u estuser:estpwd \
               --data-binary @$DEVICE_DER \
               -o $DEVICE_CERT && test -s $DEVICE_CERT"
     
