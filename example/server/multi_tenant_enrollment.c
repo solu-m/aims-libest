@@ -64,17 +64,17 @@ BIO * multi_tenant_enroll(const unsigned char *p10buf, int p10len, const char *t
         return NULL;
     }
     
-    if (strcmp(tenant_id, "gateway") != 0 && 
-        strcmp(tenant_id, "iot") != 0 && 
-        strcmp(tenant_id, "freeradius") != 0) {
-        fprintf(stderr, "[ERROR] Invalid tenant ID: %s (must be gateway, iot, or freeradius)\n", tenant_id);
+    // [1] Build tenant-specific paths
+    snprintf(tenant_dir, MAX_PATH_LEN, "%s/tenants/%s", REPO_ROOT, tenant_id);
+    
+    // Check if tenant directory exists (dynamic tenant validation)
+    struct stat st;
+    if (stat(tenant_dir, &st) != 0 || !S_ISDIR(st.st_mode)) {
+        fprintf(stderr, "[ERROR] Tenant '%s' not found or not a directory: %s\n", tenant_id, tenant_dir);
         return NULL;
     }
     
     fprintf(stderr, "[INFO] Multi-tenant enrollment started for tenant: %s\n", tenant_id);
-    
-    // [1] Build tenant-specific paths
-    snprintf(tenant_dir, MAX_PATH_LEN, "%s/tenants/%s", REPO_ROOT, tenant_id);
     snprintf(der_file, MAX_PATH_LEN, "%s/tmp_client.der", tenant_dir);
     snprintf(pem_file, MAX_PATH_LEN, "%s/tmp_client.pem", tenant_dir);
     snprintf(cert_file, MAX_PATH_LEN, "%s/tmp_client_cert.pem", tenant_dir);
