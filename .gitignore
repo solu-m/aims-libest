@@ -93,6 +93,15 @@ check-build-log.sh
 logs/
 
 ############################
+# Old test/setup scripts (obsolete)
+############################
+multi_tenant_smoke_test.sh
+setup_multi_tenant_infrastructure.sh
+docker-build-alternative.sh
+docker-quickstart.sh
+docker-rebuild-diagnostic.sh
+
+############################
 # Generated certificates (testing)
 ############################
 *.key
