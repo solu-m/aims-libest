@@ -81,36 +81,23 @@ BIO * multi_tenant_enroll(const unsigned char *p10buf, int p10len, const char *t
     snprintf(pkcs7_file, MAX_PATH_LEN, "%s/tmp_client.p7", tenant_dir);
     snprintf(config_file, MAX_PATH_LEN, "%s/%s.cnf", tenant_dir, tenant_id);
     
-    // [2] Write base64-encoded CSR to disk, then decode to DER
-    // EST protocol sends base64-encoded PKCS#10, we need binary DER for OpenSSL
-    char b64_file[MAX_PATH_LEN];
-    snprintf(b64_file, MAX_PATH_LEN, "%s/tmp_client.b64", tenant_dir);
-    
-    fp = fopen(b64_file, "wb");
+    // [2] Write DER-encoded CSR to disk
+    // Note: libest already decodes base64, so p10buf is binary DER format
+    fp = fopen(der_file, "wb");
     if (!fp) {
-        fprintf(stderr, "[ERROR] Failed to open %s for writing\n", b64_file);
+        fprintf(stderr, "[ERROR] Failed to open %s for writing\n", der_file);
         goto cleanup;
     }
     
     if (fwrite(p10buf, 1, p10len, fp) != (size_t)p10len) {
-        fprintf(stderr, "[ERROR] Failed to write complete base64 data to %s\n", b64_file);
+        fprintf(stderr, "[ERROR] Failed to write complete DER data to %s\n", der_file);
         fclose(fp);
         goto cleanup;
     }
     fclose(fp);
     fp = NULL;
-    fprintf(stderr, "[INFO] [Step 1/7] Wrote base64 CSR to %s (%d bytes)\n", b64_file, p10len);
-    
-    // Decode base64 to DER
-    snprintf(cmd, MAX_CMD_LEN, "base64 -d < %s > %s 2>&1", b64_file, der_file);
-    rc = system(cmd);
-    if (rc != 0) {
-        fprintf(stderr, "[ERROR] [Step 2/7] Base64 decode failed (rc=%d)\n", rc);
-        unlink(b64_file);
-        goto cleanup;
-    }
-    fprintf(stderr, "[INFO] [Step 2/7] Decoded base64→DER successfully\n");
-    unlink(b64_file);
+    fprintf(stderr, "[INFO] [Step 1/7] Wrote DER CSR to %s (%d bytes)\n", der_file, p10len);
+    fprintf(stderr, "[INFO] [Step 2/7] DER data ready (libest pre-decoded from base64)\n");
     
     // [3] Convert DER→PEM (openssl req -inform DER -outform PEM)
     snprintf(cmd, MAX_CMD_LEN, 
