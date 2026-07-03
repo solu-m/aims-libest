@@ -81,31 +81,36 @@ BIO * multi_tenant_enroll(const unsigned char *p10buf, int p10len, const char *t
     snprintf(pkcs7_file, MAX_PATH_LEN, "%s/tmp_client.p7", tenant_dir);
     snprintf(config_file, MAX_PATH_LEN, "%s/%s.cnf", tenant_dir, tenant_id);
     
-    // [2] Debug: Check if p10buf is base64 text or binary DER
-    // Print first 20 bytes to see the format
-    fprintf(stderr, "[DEBUG] First 20 bytes of p10buf: ");
-    for (int i = 0; i < (p10len < 20 ? p10len : 20); i++) {
-        fprintf(stderr, "%02x ", (unsigned char)p10buf[i]);
-    }
-    fprintf(stderr, "\n");
-    fprintf(stderr, "[DEBUG] As ASCII: '%.40s'\n", p10buf);
+    // [2] Write base64-encoded CSR to disk, then decode to DER
+    // p10buf contains base64 TEXT (verified by debug: starts with 'MII...')
+    char b64_file[MAX_PATH_LEN];
+    snprintf(b64_file, MAX_PATH_LEN, "%s/tmp_client.b64", tenant_dir);
     
-    // Write to DER file (assuming it's binary DER from libest)
-    fp = fopen(der_file, "wb");
+    fp = fopen(b64_file, "wb");
     if (!fp) {
-        fprintf(stderr, "[ERROR] Failed to open %s for writing\n", der_file);
+        fprintf(stderr, "[ERROR] Failed to open %s for writing\n", b64_file);
         goto cleanup;
     }
     
     if (fwrite(p10buf, 1, p10len, fp) != (size_t)p10len) {
-        fprintf(stderr, "[ERROR] Failed to write complete data to %s\n", der_file);
+        fprintf(stderr, "[ERROR] Failed to write complete base64 data to %s\n", b64_file);
         fclose(fp);
         goto cleanup;
     }
     fclose(fp);
     fp = NULL;
-    fprintf(stderr, "[INFO] [Step 1/7] Wrote data to %s (%d bytes)\n", der_file, p10len);
-    fprintf(stderr, "[INFO] [Step 2/7] Checking data format...\n");
+    fprintf(stderr, "[INFO] [Step 1/7] Wrote base64 CSR to %s (%d bytes)\n", b64_file, p10len);
+    
+    // Decode base64 to DER using openssl base64 (more reliable than 'base64' command)
+    snprintf(cmd, MAX_CMD_LEN, "openssl base64 -d -in %s -out %s 2>&1", b64_file, der_file);
+    rc = system(cmd);
+    if (rc != 0) {
+        fprintf(stderr, "[ERROR] [Step 2/7] Base64 decode failed (rc=%d)\n", rc);
+        unlink(b64_file);
+        goto cleanup;
+    }
+    fprintf(stderr, "[INFO] [Step 2/7] Decoded base64→DER successfully\n");
+    unlink(b64_file);
     
     // [3] Convert DER→PEM (openssl req -inform DER -outform PEM)
     snprintf(cmd, MAX_CMD_LEN, 
