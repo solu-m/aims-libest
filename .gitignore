@@ -54,3 +54,60 @@ Makefile
 # Python generated files
 ############################
 *.pyc
+__pycache__/
+*.py[cod]
+*$py.class
+
+############################
+# Gradle (not needed)
+############################
+.gradle/
+build.gradle
+gradle/
+gradlew
+gradlew.bat
+
+############################
+# IDE files
+############################
+.idea/
+*.iml
+.vscode/
+*.swp
+*.swo
+*~
+
+############################
+# Temporary files
+############################
+*.tmp
+*.bak
+*.log
+smoke_test_temp/
+check_enrollment.sh
+check-build-log.sh
+
+############################
+# Docker runtime
+############################
+logs/
+
+############################
+# Generated certificates (testing)
+############################
+*.key
+*.csr
+*.crt
+*.pem
+*.p7
+*.p12
+*.der
+*.b64
+
+############################
+# Session/temporary docs
+############################
+SESSION_SUMMARY.md
+FINAL_TEST_PLAN.md
+IMPLEMENTATION_SUMMARY.md
+TESTING_GUIDE.md
