@@ -802,6 +802,11 @@ int process_pkcs10_enrollment (unsigned char * pkcs10, int p10_len,
         result = multi_tenant_enroll(pkcs10, p10_len, path_seg);
         if (!result) {
             fprintf(stderr, "\n%s - Multi-tenant enrollment failed for tenant: %s\n", __FUNCTION__, path_seg);
+#ifndef WIN32
+            pthread_mutex_unlock(&m);
+#else
+            LeaveCriticalSection(&enrollment_critical_section);
+#endif
             return EST_ERR_CA_ENROLL_FAIL;
         }
     } else {
@@ -810,6 +815,15 @@ int process_pkcs10_enrollment (unsigned char * pkcs10, int p10_len,
             printf("\n%s - Standard enrollment (no tenant specified)\n", __FUNCTION__);
         }
         result = ossl_simple_enroll(pkcs10, p10_len);
+        if (!result) {
+            fprintf(stderr, "\n%s - Standard enrollment failed\n", __FUNCTION__);
+#ifndef WIN32
+            pthread_mutex_unlock(&m);
+#else
+            LeaveCriticalSection(&enrollment_critical_section);
+#endif
+            return EST_ERR_CA_ENROLL_FAIL;
+        }
     }
     
 #ifndef WIN32
