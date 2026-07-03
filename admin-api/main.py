@@ -223,6 +223,25 @@ emailAddress            = optional
     with open(tenant_dir / "index.txt.attr", 'w') as f:
         f.write("unique_subject = no\n")
     
+    # Fix ownership for EST server (runs as estuser uid=1000)
+    # This ensures the EST server can write temporary files during enrollment
+    try:
+        import pwd
+        estuser_uid = pwd.getpwnam("estuser").pw_uid
+        estuser_gid = pwd.getpwnam("estuser").pw_gid
+    except (KeyError, ImportError):
+        # Fallback to uid=1000 if estuser doesn't exist or pwd module unavailable
+        estuser_uid = 1000
+        estuser_gid = 1000
+    
+    # Recursively change ownership of all tenant files
+    for root, dirs, files in os.walk(tenant_dir):
+        os.chown(root, estuser_uid, estuser_gid)
+        for dir_name in dirs:
+            os.chown(os.path.join(root, dir_name), estuser_uid, estuser_gid)
+        for file_name in files:
+            os.chown(os.path.join(root, file_name), estuser_uid, estuser_gid)
+    
     # Read CA certificate for response
     with open(ca_cert_path, 'r') as f:
         ca_certificate = f.read()
