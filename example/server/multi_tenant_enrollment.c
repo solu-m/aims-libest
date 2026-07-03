@@ -81,8 +81,16 @@ BIO * multi_tenant_enroll(const unsigned char *p10buf, int p10len, const char *t
     snprintf(pkcs7_file, MAX_PATH_LEN, "%s/tmp_client.p7", tenant_dir);
     snprintf(config_file, MAX_PATH_LEN, "%s/%s.cnf", tenant_dir, tenant_id);
     
-    // [2] Write DER-encoded CSR to disk
-    // Note: libest already decodes base64, so p10buf is binary DER format
+    // [2] Debug: Check if p10buf is base64 text or binary DER
+    // Print first 20 bytes to see the format
+    fprintf(stderr, "[DEBUG] First 20 bytes of p10buf: ");
+    for (int i = 0; i < (p10len < 20 ? p10len : 20); i++) {
+        fprintf(stderr, "%02x ", (unsigned char)p10buf[i]);
+    }
+    fprintf(stderr, "\n");
+    fprintf(stderr, "[DEBUG] As ASCII: '%.40s'\n", p10buf);
+    
+    // Write to DER file (assuming it's binary DER from libest)
     fp = fopen(der_file, "wb");
     if (!fp) {
         fprintf(stderr, "[ERROR] Failed to open %s for writing\n", der_file);
@@ -90,14 +98,14 @@ BIO * multi_tenant_enroll(const unsigned char *p10buf, int p10len, const char *t
     }
     
     if (fwrite(p10buf, 1, p10len, fp) != (size_t)p10len) {
-        fprintf(stderr, "[ERROR] Failed to write complete DER data to %s\n", der_file);
+        fprintf(stderr, "[ERROR] Failed to write complete data to %s\n", der_file);
         fclose(fp);
         goto cleanup;
     }
     fclose(fp);
     fp = NULL;
-    fprintf(stderr, "[INFO] [Step 1/7] Wrote DER CSR to %s (%d bytes)\n", der_file, p10len);
-    fprintf(stderr, "[INFO] [Step 2/7] DER data ready (libest pre-decoded from base64)\n");
+    fprintf(stderr, "[INFO] [Step 1/7] Wrote data to %s (%d bytes)\n", der_file, p10len);
+    fprintf(stderr, "[INFO] [Step 2/7] Checking data format...\n");
     
     // [3] Convert DER→PEM (openssl req -inform DER -outform PEM)
     snprintf(cmd, MAX_CMD_LEN, 
