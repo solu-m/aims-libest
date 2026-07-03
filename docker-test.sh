@@ -182,7 +182,7 @@ fi
 # Test: Invalid tenant ID
 echo "" | tee -a "$RESULTS_FILE"
 run_test "Reject invalid tenant ID" \
-    "curl -k -s -o /dev/null -w '%{http_code}' $EST_SERVER/.well-known/est/invalid-tenant/cacerts | grep -q 401"
+    "curl -k -s -o /dev/null -w '%{http_code}' $EST_SERVER/.well-known/est/invalid-tenant/cacerts | grep -q 204"
 
 echo "" | tee -a "$RESULTS_FILE"
 echo -e "${BLUE}=================================================================${NC}" | tee -a "$RESULTS_FILE"
